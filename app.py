@@ -6,28 +6,27 @@ from transformers import pipeline
 import pandas as pd
 import datetime
 
-# 1. SETUP & SMOOTH THEME
-load_dotenv()
-my_token = os.getenv("HF_TOKEN")
+# 1. SETUP & THEME
+# Secure token loading for Streamlit Cloud and Local
+if "HF_TOKEN" in st.secrets:
+    my_token = st.secrets["HF_TOKEN"]
+else:
+    load_dotenv()
+    my_token = os.getenv("HF_TOKEN")
 
 st.set_page_config(page_title="Student Buddy AI", page_icon="🤖")
 
-# --- SMOOTH GRADIENT THEME ---
+# --- SMOOTH GRADIENT THEME (CSS) ---
 st.markdown("""
     <style>
-    /* Smooth Radial Gradient Background */
     .stApp {
         background: radial-gradient(circle, #1a1c2c 0%, #0e1117 100%);
         color: #e0e0e0;
     }
-    
-    /* Sidebar with a smooth blur effect */
     [data-testid="stSidebar"] {
         background-color: rgba(22, 27, 34, 0.8);
         backdrop-filter: blur(10px);
     }
-    
-    /* Glassmorphism Input Box */
     .stTextInput input {
         background-color: rgba(255, 255, 255, 0.05);
         color: white;
@@ -35,8 +34,6 @@ st.markdown("""
         border-radius: 15px;
         padding: 10px;
     }
-
-    /* Professional Blue Button */
     .stButton>button {
         border-radius: 20px;
         background: linear-gradient(90deg, #4facfe 0%, #00f2fe 100%);
@@ -49,14 +46,10 @@ st.markdown("""
         transform: scale(1.02);
         box-shadow: 0px 4px 15px rgba(0, 242, 254, 0.4);
     }
-    
-    /* Neon Glow for Metrics */
     [data-testid="stMetricValue"] {
         color: #00f2fe !important;
         text-shadow: 0 0 10px rgba(0, 242, 254, 0.5);
     }
-    
-    /* Smooth Breathing Circle */
     .dot {
         height: 80px; width: 80px;
         background: radial-gradient(circle, #00f2fe, #4facfe);
@@ -92,8 +85,7 @@ with st.sidebar:
     st.subheader("🎯 Daily Mission")
     
     if st.button("Get My Mission"):
-        # Get the latest mood score if it exists, otherwise default to 0
-        current_score = st.session_state.mood_history[-1]['Score'] if st.session_state.mood_history else 0
+        current_score = st.session_state.mood_history[-1]['Score'] if 'mood_history' in st.session_state and st.session_state.mood_history else 0
         
         if current_score < -0.1:
             mission = "Listen to one song that makes you feel powerful. 🎵"
@@ -117,7 +109,6 @@ with st.sidebar:
     
     st.divider()
     st.subheader("🆘 Quick Help")
-    # Wikipedia and WHO are very reliable for apps
     st.link_button("View Support Resources", "https://en.wikipedia.org/wiki/Mental_health")
     st.caption("Link not working? Try: https://www.who.int/health-topics/mental-health")
 
@@ -153,14 +144,14 @@ if user_input:
     # --- Save History ---
     st.session_state.mood_history.append({"Time": datetime.datetime.now().strftime("%H:%M:%S"), "Score": score})
 
-# 4. DASHBOARD
+# 4. DASHBOARD & ANALYSIS
 if st.session_state.mood_history:
     st.divider()
     st.subheader("📈 Emotional Insights")
     df = pd.DataFrame(st.session_state.mood_history)
     
     col1, col2 = st.columns(2)
-    col1.metric("Current Vibe", f"{score:.2f}")
+    col1.metric("Current Vibe", f"{st.session_state.mood_history[-1]['Score']:.2f}")
     
     avg_score = df["Score"].mean()
     status = "Thriving ✨" if avg_score > 0 else "Needs Care 💙"
@@ -168,10 +159,10 @@ if st.session_state.mood_history:
     
     st.line_chart(df.set_index("Time"))
 
-    # 5. FINAL SESSION SUMMARY
-if len(st.session_state.mood_history) > 3:
-    with st.expander("📊 View Session Analysis"):
-        st.write(f"Total messages analyzed: {len(st.session_state.mood_history)}")
-        highest_mood = df["Score"].max()
-        st.write(f"Your peak mood score today: **{highest_mood:.2f}**")
-        st.write("Keep using the buddy to see your long-term trends!")
+    # 5. FINAL SESSION SUMMARY (Corrected Indentation)
+    if len(st.session_state.mood_history) > 3:
+        with st.expander("📊 View Session Analysis"):
+            st.write(f"Total messages analyzed: {len(st.session_state.mood_history)}")
+            highest_mood = df["Score"].max()
+            st.write(f"Your peak mood score today: **{highest_mood:.2f}**")
+            st.write("Keep using the buddy to see your long-term trends!")
