@@ -1,6 +1,5 @@
 streamlit
 textblob
-transformers
-torch
 pandas
 python-dotenv
+requests
