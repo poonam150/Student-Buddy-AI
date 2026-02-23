@@ -15,7 +15,6 @@ else:
 
 # --- FAST API FUNCTION ---
 def query_hf_api(prompt_text):
-    # This calls Hugging Face's high-speed servers directly
     API_URL = "https://api-inference.huggingface.co/models/TinyLlama/TinyLlama-1.1B-Chat-v1.0"
     headers = {"Authorization": f"Bearer {my_token}"}
     payload = {
@@ -24,7 +23,8 @@ def query_hf_api(prompt_text):
             "max_new_tokens": 150, 
             "temperature": 0.7, 
             "return_full_text": False
-        }
+        },
+        "options": {"wait_for_model": True} # Automatically waits for the AI to wake up
     }
     response = requests.post(API_URL, headers=headers, json=payload)
     return response.json()
@@ -47,6 +47,7 @@ st.markdown("""
         color: white;
         border: 1px solid rgba(255, 255, 255, 0.1);
         border-radius: 15px;
+        padding: 10px;
     }
     .stButton>button {
         border-radius: 20px;
@@ -54,6 +55,11 @@ st.markdown("""
         color: white;
         font-weight: bold;
         border: none;
+        transition: 0.3s;
+    }
+    .stButton>button:hover {
+        transform: scale(1.05);
+        box-shadow: 0px 4px 15px rgba(0, 242, 254, 0.4);
     }
     [data-testid="stMetricValue"] {
         color: #00f2fe !important;
@@ -65,6 +71,7 @@ st.markdown("""
         border-radius: 50%;
         margin: 20px auto;
         animation: pulse 4s ease-in-out infinite;
+        box-shadow: 0 0 20px rgba(0, 242, 254, 0.6);
     }
     @keyframes pulse {
         0% { transform: scale(0.7); opacity: 0.5; }
@@ -80,7 +87,7 @@ with st.sidebar:
     
     st.subheader("🧘 Breathing Guide")
     if st.checkbox("Start Breathing Exercise"):
-        st.write("Inhale... Exhale...")
+        st.write("Focus on the light... Inhale... Exhale...")
         st.markdown('<div class="dot"></div>', unsafe_allow_html=True)
 
     st.divider()
@@ -102,7 +109,7 @@ with st.sidebar:
     
     st.divider()
     st.subheader("📝 Daily Journal")
-    journal_note = st.text_area("Write freely...", placeholder="How's your mental energy today?")
+    journal_note = st.text_area("Write freely...", placeholder="How's your mental energy today?", key="journal")
     if st.button("Save Entry"):
         st.success("Entry locked in.")
         st.balloons()
@@ -118,7 +125,7 @@ st.write("Your safe space for thoughts and self-care tips.")
 if 'mood_history' not in st.session_state:
     st.session_state.mood_history = []
 
-user_input = st.text_input("Type how you're feeling...")
+user_input = st.text_input("Type how you're feeling...", placeholder="Enter your thoughts here...")
 
 if user_input:
     # --- Analysis ---
@@ -131,14 +138,12 @@ if user_input:
     with st.spinner("Reflecting on your words..."):
         try:
             output = query_hf_api(prompt)
-            # The API returns generated text inside a list
             if isinstance(output, list) and len(output) > 0:
                 bot_text = output[0].get('generated_text', "I'm thinking... please try again.")
             else:
-                # If API is "warming up", it might return a message instead of a list
-                bot_text = "The AI is warming up its brain. Please try typing your message again in 10 seconds!"
+                bot_text = "I'm warming up my processing. Please send your message once more!"
         except Exception as e:
-            bot_text = "Connection is a bit slow. Please try again."
+            bot_text = "My connection is a bit slow. Please try again in a moment."
 
     # --- Results & Safety ---
     if score < -0.4:
@@ -156,7 +161,8 @@ if st.session_state.mood_history:
     df = pd.DataFrame(st.session_state.mood_history)
     
     col1, col2 = st.columns(2)
-    col1.metric("Current Vibe", f"{st.session_state.mood_history[-1]['Score']:.2f}")
+    current_score = st.session_state.mood_history[-1]['Score']
+    col1.metric("Current Vibe", f"{current_score:.2f}")
     
     avg_score = df["Score"].mean()
     status = "Thriving ✨" if avg_score > 0 else "Needs Care 💙"
@@ -164,9 +170,14 @@ if st.session_state.mood_history:
     
     st.line_chart(df.set_index("Time"))
 
-    if len(st.session_state.mood_history) > 3:
+    # 5. SESSION SUMMARY
+    if len(st.session_state.mood_history) >= 1:
         with st.expander("📊 View Session Analysis"):
+            st.write(f"Total messages analyzed: **{len(st.session_state.mood_history)}**")
             highest_mood = df["Score"].max()
-            st.write(f"Your peak mood score today: **{highest_mood:.2f}**")
-            st.write("Keep using the buddy to see your long-term trends!")
+            lowest_mood = df["Score"].min()
+            st.write(f"Your peak mood score: **{highest_mood:.2f}**")
+            st.write(f"Your lowest mood score: **{lowest_mood:.2f}**")
+            st.write("Keep chatting to see how your vibe shifts over time!")
+
 
