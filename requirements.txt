@@ -1,0 +1,6 @@
+streamlit
+textblob
+transformers
+torch
+pandas
+python-dotenv
