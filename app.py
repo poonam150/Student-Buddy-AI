@@ -1,22 +1,37 @@
 import streamlit as st
 from textblob import TextBlob
 import os
-from dotenv import load_dotenv
-from transformers import pipeline
+import requests
 import pandas as pd
 import datetime
+from dotenv import load_dotenv
 
-# 1. SETUP & THEME
-# Secure token loading for Streamlit Cloud and Local
+# 1. SETUP & SECURE TOKEN LOADING
 if "HF_TOKEN" in st.secrets:
     my_token = st.secrets["HF_TOKEN"]
 else:
     load_dotenv()
     my_token = os.getenv("HF_TOKEN")
 
+# --- FAST API FUNCTION ---
+def query_hf_api(prompt_text):
+    # This calls Hugging Face's high-speed servers directly
+    API_URL = "https://api-inference.huggingface.co/models/TinyLlama/TinyLlama-1.1B-Chat-v1.0"
+    headers = {"Authorization": f"Bearer {my_token}"}
+    payload = {
+        "inputs": prompt_text,
+        "parameters": {
+            "max_new_tokens": 150, 
+            "temperature": 0.7, 
+            "return_full_text": False
+        }
+    }
+    response = requests.post(API_URL, headers=headers, json=payload)
+    return response.json()
+
 st.set_page_config(page_title="Student Buddy AI", page_icon="🤖")
 
-# --- SMOOTH GRADIENT THEME (CSS) ---
+# --- SMOOTH UI THEME (CSS) ---
 st.markdown("""
     <style>
     .stApp {
@@ -32,7 +47,6 @@ st.markdown("""
         color: white;
         border: 1px solid rgba(255, 255, 255, 0.1);
         border-radius: 15px;
-        padding: 10px;
     }
     .stButton>button {
         border-radius: 20px;
@@ -40,11 +54,6 @@ st.markdown("""
         color: white;
         font-weight: bold;
         border: none;
-        transition: 0.3s;
-    }
-    .stButton>button:hover {
-        transform: scale(1.02);
-        box-shadow: 0px 4px 15px rgba(0, 242, 254, 0.4);
     }
     [data-testid="stMetricValue"] {
         color: #00f2fe !important;
@@ -56,7 +65,6 @@ st.markdown("""
         border-radius: 50%;
         margin: 20px auto;
         animation: pulse 4s ease-in-out infinite;
-        box-shadow: 0 0 20px rgba(0, 242, 254, 0.6);
     }
     @keyframes pulse {
         0% { transform: scale(0.7); opacity: 0.5; }
@@ -66,34 +74,26 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-@st.cache_resource
-def load_chatbot():
-    return pipeline("text-generation", model="TinyLlama/TinyLlama-1.1B-Chat-v1.0", token=my_token)
-
-chat_engine = load_chatbot()
-
 # 2. SIDEBAR
 with st.sidebar:
     st.title("☀️ Zen Zone")
     
     st.subheader("🧘 Breathing Guide")
     if st.checkbox("Start Breathing Exercise"):
-        st.write("Focus on the light... Inhale... Exhale...")
+        st.write("Inhale... Exhale...")
         st.markdown('<div class="dot"></div>', unsafe_allow_html=True)
 
     st.divider()
     st.subheader("🎯 Daily Mission")
-    
     if st.button("Get My Mission"):
+        # Logic based on mood history
         current_score = st.session_state.mood_history[-1]['Score'] if 'mood_history' in st.session_state and st.session_state.mood_history else 0
-        
         if current_score < -0.1:
             mission = "Listen to one song that makes you feel powerful. 🎵"
         elif current_score > 0.3:
             mission = "You're doing great! Share that energy—send a nice text to a friend. 📱"
         else:
             mission = "Take a 2-minute 'tech break' and look out a window. 🪟"
-            
         st.session_state.current_mission = mission
         st.balloons()
 
@@ -110,7 +110,6 @@ with st.sidebar:
     st.divider()
     st.subheader("🆘 Quick Help")
     st.link_button("View Support Resources", "https://en.wikipedia.org/wiki/Mental_health")
-    st.caption("Link not working? Try: https://www.who.int/health-topics/mental-health")
 
 # 3. MAIN INTERFACE
 st.title("🤖 Student Buddy AI")
@@ -126,25 +125,31 @@ if user_input:
     blob = TextBlob(user_input)
     score = blob.sentiment.polarity
     
-    # --- AI Suggestions ---
+    # --- AI Suggestions (Fast API Call) ---
     prompt = f"<|system|>\nYou are a supportive counselor. Give 3 short, actionable self-care tips in bullets.\n<|user|>\n{user_input}\n<|assistant|>\n"
     
     with st.spinner("Reflecting on your words..."):
-        response = chat_engine(prompt, max_new_tokens=150, do_sample=True, temperature=0.7)
-        bot_text = response[0]['generated_text'].split("<|assistant|>\n")[-1]
+        try:
+            output = query_hf_api(prompt)
+            # The API returns generated text inside a list
+            if isinstance(output, list) and len(output) > 0:
+                bot_text = output[0].get('generated_text', "I'm thinking... please try again.")
+            else:
+                # If API is "warming up", it might return a message instead of a list
+                bot_text = "The AI is warming up its brain. Please try typing your message again in 10 seconds!"
+        except Exception as e:
+            bot_text = "Connection is a bit slow. Please try again."
 
-    # --- Safety Check ---
+    # --- Results & Safety ---
     if score < -0.4:
-        st.error("🚨 **Important:** You sound like you're going through a lot. Please reach out to a professional or a support hotline. You aren't alone.")
+        st.error("🚨 **Important:** You sound like you're going through a lot. Please reach out to a professional.")
     
     st.chat_message("assistant").write(bot_text)
     
-    st.download_button(label="📥 Save Wellness Plan", data=bot_text, file_name="wellness_plan.txt")
-
     # --- Save History ---
     st.session_state.mood_history.append({"Time": datetime.datetime.now().strftime("%H:%M:%S"), "Score": score})
 
-# 4. DASHBOARD & ANALYSIS
+# 4. DASHBOARD
 if st.session_state.mood_history:
     st.divider()
     st.subheader("📈 Emotional Insights")
@@ -159,10 +164,9 @@ if st.session_state.mood_history:
     
     st.line_chart(df.set_index("Time"))
 
-    # 5. FINAL SESSION SUMMARY (Corrected Indentation)
     if len(st.session_state.mood_history) > 3:
         with st.expander("📊 View Session Analysis"):
-            st.write(f"Total messages analyzed: {len(st.session_state.mood_history)}")
             highest_mood = df["Score"].max()
             st.write(f"Your peak mood score today: **{highest_mood:.2f}**")
             st.write("Keep using the buddy to see your long-term trends!")
+
