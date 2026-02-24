@@ -13,7 +13,7 @@ else:
 
 try:
     genai.configure(api_key=api_key)
-    model = genai.GenerativeModel('gemini-pro')
+    model = genai.GenerativeModel('gemini-1.5-flash-latest')
 except Exception as e:
     st.error(f"Setup Error: {e}")
 
@@ -52,6 +52,7 @@ if st.session_state.mood_history:
     df = pd.DataFrame(st.session_state.mood_history)
     st.metric("Mood Score", f"{st.session_state.mood_history[-1]['Score']}")
     st.line_chart(df.set_index("Time")["Score"])
+
 
 
 
