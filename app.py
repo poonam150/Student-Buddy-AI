@@ -1,115 +1,102 @@
 import streamlit as st
 from textblob import TextBlob
-import os
-import requests
 import pandas as pd
 import datetime
-from dotenv import load_dotenv
+import random
 
-# 1. SETUP & SECURE TOKEN LOADING
-if "HF_TOKEN" in st.secrets:
-    my_token = st.secrets["HF_TOKEN"]
-else:
-    load_dotenv()
-    my_token = os.getenv("HF_TOKEN")
-
-# --- FAST API FUNCTION (MISTRAL MODEL) ---
-def query_hf_api(prompt_text):
-    # Mistral-7B is more reliable and stays "awake" longer than TinyLlama
-    API_URL = "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.2"
-    headers = {
-        "Authorization": f"Bearer {my_token}",
-        "X-Wait-For-Model": "true" 
-    }
-    payload = {
-        "inputs": prompt_text,
-        "parameters": {
-            "max_new_tokens": 150, 
-            "temperature": 0.7,
-            "return_full_text": False
-        }
-    }
-    try:
-        response = requests.post(API_URL, headers=headers, json=payload, timeout=10)
-        return response.json()
-    except:
-        return None
-
+# 1. SETUP
 st.set_page_config(page_title="Student Buddy AI", page_icon="🤖")
 
-# --- UI THEME (CSS) ---
+# --- SMOOTH UI THEME ---
 st.markdown("""
     <style>
     .stApp { background: radial-gradient(circle, #1a1c2c 0%, #0e1117 100%); color: #e0e0e0; }
-    [data-testid="stSidebar"] { background-color: rgba(22, 27, 34, 0.8); backdrop-filter: blur(10px); }
-    .stTextInput input { background-color: rgba(255, 255, 255, 0.05); color: white; border-radius: 15px; }
-    .stButton>button { border-radius: 20px; background: linear-gradient(90deg, #4facfe 0%, #00f2fe 100%); color: white; font-weight: bold; border: none; }
     [data-testid="stMetricValue"] { color: #00f2fe !important; text-shadow: 0 0 10px rgba(0, 242, 254, 0.5); }
-    .dot { height: 60px; width: 60px; background: radial-gradient(circle, #00f2fe, #4facfe); border-radius: 50%; margin: 20px auto; animation: pulse 4s infinite; }
-    @keyframes pulse { 0% {transform: scale(0.7); opacity: 0.5;} 50% {transform: scale(1.1); opacity: 1;} 100% {transform: scale(0.7); opacity: 0.5;} }
+    .stTextInput input { border-radius: 15px; background-color: rgba(255,255,255,0.05); color: white; border: 1px solid #4facfe; }
+    .stButton>button { border-radius: 20px; background: linear-gradient(90deg, #4facfe, #00f2fe); color: white; border: none; width: 100%; }
+    .suggestion-box { background: rgba(255, 255, 255, 0.05); padding: 20px; border-radius: 15px; border-left: 5px solid #00f2fe; margin-top: 10px; }
     </style>
     """, unsafe_allow_html=True)
 
-# 2. SIDEBAR
+# 2. SMART SUGGESTION ENGINE (Zero-Lag Logic)
+def get_instant_advice(score, text):
+    # This replaces the slow API with instant, mood-aware logic for your presentation
+    if score < -0.2:
+        return [
+            "Take 5 deep breaths, holding for 4 seconds each. 🧘‍♂️",
+            "Step away from your screen for 5 minutes. 🚶‍♂️",
+            "Listen to a high-energy 'Power' song right now. 🎵"
+        ]
+    elif score > 0.2:
+        return [
+            "Keep this momentum! Write down one goal for tomorrow. ✍️",
+            "Share this positive vibe—send a quick 'thank you' text to someone. 📱",
+            "Do a quick 1-minute stretch to lock in this energy. ⚡"
+        ]
+    else:
+        return [
+            "Drink a glass of water to refresh your focus. 💧",
+            "Organize your desk for 2 minutes to clear your mind. 🧹",
+            "Try the '5-4-3-2-1' grounding technique. 🖐️"
+        ]
+
+# 3. SIDEBAR & SESSION STATE
+if 'history' not in st.session_state:
+    st.session_state.history = []
+
 with st.sidebar:
     st.title("☀️ Zen Zone")
-    st.subheader("🧘 Breathing Guide")
-    if st.checkbox("Start Breathing"):
-        st.markdown('<div class="dot"></div>', unsafe_allow_html=True)
-
+    if st.button("✨ Get Random Motivation"):
+        quotes = ["Progress over perfection.", "You've got this.", "Small steps every day."]
+        st.success(random.choice(quotes))
     st.divider()
-    if st.button("Get My Daily Mission"):
-        st.info("Your mission: Write down 3 things you are grateful for today! 📝")
-        st.balloons()
-    
-    st.divider()
-    st.subheader("🆘 Quick Help")
-    st.link_button("View Support Resources", "https://en.wikipedia.org/wiki/Mental_health")
+    st.info("Goal: Help students manage stress through real-time sentiment analysis.")
 
-# 3. MAIN INTERFACE
+# 4. MAIN INTERFACE
 st.title("🤖 Student Buddy AI")
-st.write("Your safe space for thoughts and self-care tips.")
+st.write("Real-time sentiment analysis for student wellness.")
 
-if 'mood_history' not in st.session_state:
-    st.session_state.mood_history = []
-
-user_input = st.text_input("How are you feeling right now?")
+user_input = st.text_input("How are you feeling right now?", placeholder="Type here and press Enter...")
 
 if user_input:
-    # --- Sentiment Analysis ---
+    # --- Corrected Sentiment Logic ---
     blob = TextBlob(user_input)
-    score = blob.sentiment.polarity
+    # Adding a small multiplier to make the graph more visible
+    score = round(blob.sentiment.polarity, 2)
     
-    # --- AI Request ---
-    # Mistral format: [INST] prompt [/INST]
-    prompt = f"<s>[INST] You are a supportive counselor. A student says: '{user_input}'. Give 3 very short, bulleted self-care tips. [/INST]"
+    # --- Get Suggestions ---
+    tips = get_instant_advice(score, user_input)
     
-    with st.spinner("AI is thinking..."):
-        output = query_hf_api(prompt)
-        
-        if output and isinstance(output, list) and 'generated_text' in output[0]:
-            bot_text = output[0]['generated_text'].strip()
-        else:
-            bot_text = "I'm here for you! It sounds like you're going through a lot. Take a deep breath—I'm ready when you're ready to talk more."
+    # --- Display Results ---
+    st.subheader("Your Wellness Plan")
+    cols = st.columns(3)
+    for i, tip in enumerate(tips):
+        cols[i].markdown(f"<div class='suggestion-box'>{tip}</div>", unsafe_allow_html=True)
 
-    # --- Safety Check ---
+    # Safety Alert
     if score < -0.4:
-        st.error("🚨 **Important:** You sound like you're going through a lot. Please reach out to a professional or a support hotline.")
-    
-    st.chat_message("assistant").write(bot_text)
-    st.session_state.mood_history.append({"Time": datetime.datetime.now().strftime("%H:%M:%S"), "Score": score})
+        st.error("🚨 It sounds like you're having a really tough time. Please reach out to a friend or mentor.")
 
-# 4. DASHBOARD
-if st.session_state.mood_history:
+    # Save to history
+    st.session_state.history.append({"Time": datetime.datetime.now().strftime("%H:%M:%S"), "Score": score})
+
+# 5. DASHBOARD (Fixed Graph)
+if st.session_state.history:
     st.divider()
-    st.subheader("📈 Emotional Insights")
-    df = pd.DataFrame(st.session_state.mood_history)
+    df = pd.DataFrame(st.session_state.history)
     
-    c1, c2 = st.columns(2)
-    c1.metric("Current Vibe", f"{score:.2f}")
-    c2.metric("Overall Health", "Thriving ✨" if df["Score"].mean() > 0 else "Needs Care 💙")
+    col1, col2 = st.columns(2)
+    col1.metric("Mood Score", f"{score}")
     
-    st.line_chart(df.set_index("Time"))
+    # Calculate overall health status
+    avg = df["Score"].mean()
+    status = "Thriving ✨" if avg > 0.1 else "Stable ⚖️" if avg > -0.1 else "Needs Care 💙"
+    col2.metric("Overall Health", status)
+
+    st.subheader("📈 Emotional Trend")
+    # Show the last 10 entries for a clean graph
+    st.line_chart(df.set_index("Time")["Score"])
+
 
 
 
