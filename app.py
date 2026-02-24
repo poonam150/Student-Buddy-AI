@@ -2,100 +2,89 @@ import streamlit as st
 from textblob import TextBlob
 import pandas as pd
 import datetime
-import random
+import requests
+import os
+from dotenv import load_dotenv
 
-# 1. PAGE SETUP
+# 1. SETUP
+if "HF_TOKEN" in st.secrets:
+    my_token = st.secrets["HF_TOKEN"]
+else:
+    load_dotenv()
+    my_token = os.getenv("HF_TOKEN")
+
 st.set_page_config(page_title="Student Buddy AI", page_icon="🤖")
 
-# --- SMOOTH UI THEME ---
+# --- CUSTOM CSS ---
 st.markdown("""
     <style>
     .stApp { background: radial-gradient(circle, #1a1c2c 0%, #0e1117 100%); color: #e0e0e0; }
-    [data-testid="stMetricValue"] { color: #00f2fe !important; text-shadow: 0 0 10px rgba(0, 242, 254, 0.5); }
     .stTextInput input { border-radius: 15px; background-color: rgba(255,255,255,0.05); color: white; border: 1px solid #4facfe; }
     .stButton>button { border-radius: 20px; background: linear-gradient(90deg, #4facfe, #00f2fe); color: white; border: none; }
-    .suggestion-box { background: rgba(255, 255, 255, 0.05); padding: 15px; border-radius: 15px; border-left: 5px solid #00f2fe; margin-bottom: 10px; }
     </style>
     """, unsafe_allow_html=True)
 
-# 2. INSTANT NLP LOGIC (Zero Lag)
-def get_counselor_advice(sentiment_score):
-    if sentiment_score < -0.1:
-        return [
-            "Take 5 deep breaths. You are stronger than this moment. 🧘‍♂️",
-            "Try a 5-minute walk to clear your head. 🚶‍♂️",
-            "Journaling your thoughts can help release stress. 📝"
-        ]
-    elif sentiment_score > 0.1:
-        return [
-            "You're in a great head space! What's one thing you achieved today? 🌟",
-            "Keep this energy going by helping a friend. 😊",
-            "Lock in this mood by writing down what made you happy. ✍️"
-        ]
-    else:
-        return [
-            "Focus on one small task at a time. You've got this. ✅",
-            "Stay hydrated—grab a glass of water. 💧",
-            "A quick 1-minute stretch can boost your focus. 🤸‍♂️"
-        ]
+# 2. AI BRAIN FUNCTION
+def get_ai_response(user_text):
+    API_URL = "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.2"
+    headers = {"Authorization": f"Bearer {my_token}", "X-Wait-For-Model": "true"}
+    
+    # We ask the AI to be a friend, not a robot
+    prompt = f"<s>[INST] You are a kind student buddy. Someone says: '{user_text}'. Reply with one comforting sentence and then give 2 short self-care tips. [/INST]"
+    
+    try:
+        response = requests.post(API_URL, headers=headers, json={"inputs": prompt, "parameters": {"max_new_tokens": 100}}, timeout=10)
+        result = response.json()
+        raw_output = result[0]['generated_text']
+        return raw_output.split("[/INST]")[-1].strip()
+    except:
+        # Emergency backup if AI is slow
+        return "I'm listening. That sounds tough, but you aren't alone. Try drinking some water and taking a 5-minute walk."
 
-# 3. INITIALIZATION
+# 3. APP LOGIC
 if 'mood_history' not in st.session_state:
     st.session_state.mood_history = []
 
-# 4. SIDEBAR
-with st.sidebar:
-    st.title("☀️ Zen Zone")
-    if st.button("✨ Daily Motivation"):
-        quotes = ["Progress over perfection.", "You are enough.", "Believe in yourself."]
-        st.success(random.choice(quotes))
-    st.divider()
-    st.write("Using TextBlob NLP for Sentiment Analysis.")
-
-# 5. MAIN INTERFACE
 st.title("🤖 Student Buddy AI")
-st.write("Real-time emotional support and wellness tracking.")
+st.write("Talk to me. I'm here to listen and help you track your vibes.")
 
-user_input = st.text_input("How are you feeling right now?", key="user_msg")
+user_input = st.text_input("What's on your mind?", key="input")
 
 if user_input:
-    # --- NLP ANALYSIS ---
+    # --- SENTIMENT ---
     analysis = TextBlob(user_input)
-    current_score = round(analysis.sentiment.polarity, 2)
+    # We "smooth" the score so the chart doesn't jump too drastically
+    new_score = analysis.sentiment.polarity
+    
+    # --- AI TALK ---
+    with st.spinner("Buddy is thinking..."):
+        reply = get_ai_response(user_input)
+    
+    st.chat_message("assistant").write(reply)
     
     # --- SAVE TO HISTORY ---
     st.session_state.mood_history.append({
         "Time": datetime.datetime.now().strftime("%H:%M:%S"), 
-        "Score": current_score
+        "Score": new_score
     })
 
-    # --- DISPLAY ADVICE ---
-    st.subheader("Your Personalized Care Tips")
-    tips = get_counselor_advice(current_score)
-    for tip in tips:
-        st.markdown(f"<div class='suggestion-box'>{tip}</div>", unsafe_allow_html=True)
-
-    # Safety Alert
-    if current_score < -0.4:
-        st.error("🚨 It sounds like you're going through a lot. Please consider talking to a trusted friend or mentor.")
-
-# 6. DASHBOARD (Protected from NameErrors)
+# 4. SMOOTH CHART DASHBOARD
 if st.session_state.mood_history:
     st.divider()
-    st.subheader("📈 Emotional Trend")
-    
     df = pd.DataFrame(st.session_state.mood_history)
     
     col1, col2 = st.columns(2)
-    latest_score = st.session_state.mood_history[-1]["Score"]
-    col1.metric("Current Vibe", f"{latest_score}")
+    col1.metric("Current Vibe", f"{st.session_state.mood_history[-1]['Score']:.2f}")
     
+    # Overall Status logic
     avg_score = df["Score"].mean()
-    status = "Positive ✨" if avg_score > 0.1 else "Neutral ⚖️" if avg_score > -0.1 else "Needs Care 💙"
-    col2.metric("Overall Status", status)
+    status = "Thriving ✨" if avg_score > 0.2 else "Doing Okay ⚖️" if avg_score > -0.2 else "Needs Support 💙"
+    col2.metric("Overall Health", status)
 
-    # Visualization
+    st.subheader("📈 Your Mood Journey")
+    # We show the line chart with a fixed scale so it doesn't look "crazy"
     st.line_chart(df.set_index("Time")["Score"])
+
 
 
 
