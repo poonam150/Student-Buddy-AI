@@ -1,6 +1,7 @@
 streamlit
 textblob
 pandas
-google-generativeai
+google-genai
+
 
 
