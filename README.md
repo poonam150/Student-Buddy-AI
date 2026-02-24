@@ -1,44 +1,47 @@
 # 🤖 Student Buddy AI Pro
-> **An Intelligent Mental Health Companion & Productivity Tracker for Students.**
+> **Your 24/7 Intelligent Companion for Academic Success and Emotional Well-being.**
 
-[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_svg)](https://student-buddy-ai.streamlit.app/)
+[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_svg)](https://student-buddy-ai-ryicjbgyzyfsauws5mhj26.streamlit.app/)
 [![Model: Gemini-2.5-Flash](https://img.shields.io/badge/Model-Gemini--2.5--Flash-blueviolet)](https://deepmind.google/technologies/gemini/)
 
-## 🌟 Project Overview
-**Student Buddy AI** is a 24/7 digital companion designed to support students through academic stress and burnout. Using the cutting-edge **Google Gemini 2.5 Flash** model, the application provides empathetic conversational support while simultaneously analyzing sentiment to track emotional well-being over time.
-
-
+## 🌟 Overview
+**Student Buddy AI Pro** is a specialized mental health and productivity assistant designed to combat student burnout. Built using **Streamlit** and powered by the **Google Gemini 2.5 Flash** large language model, it provides empathetic support while tracking emotional trends through advanced sentiment analysis.
 
 ## ✨ Key Features
-* **💬 Empathetic AI Chat:** Natural, human-like dialogue focused on student challenges like exam anxiety and project deadlines.
-* **📊 Emotional Trend Dashboard:** Real-time data visualization of your mood history using AI-generated sentiment scores.
-* **🧘‍♂️ Zen Tools Sidebar:** Includes a guided 1-minute breathing timer for immediate stress relief.
-* **🚀 Auto-Discovery Engine:** Advanced logic that automatically connects to the most stable AI model available to prevent downtime.
-* **🚨 Safety Integration:** Built-in links and resources for immediate crisis support.
+* **🧠 Empathetic AI Chat:** Real-time, human-like conversations tailored to student life (stress, exams, and project pressure).
+* **📊 Mood Dashboard:** Automatically visualizes your emotional journey with a live line chart and sentiment metrics.
+* **🧘‍♂️ Zen Tools:** Integrated "Quick Stress Reset" with a guided breathing timer in the sidebar.
+* **🚀 Auto-Discovery Engine:** Advanced error handling that ensures a stable connection to the latest Google Gemini models.
+* **🛡️ Crisis Support:** Quick-access information for immediate mental health resources.
 
-## 🛠️ Technical Stack
-| Category | Technology |
+## 🛠️ Tech Stack
+| Component | Technology |
 | :--- | :--- |
-| **Frontend UI** | Streamlit (Python) |
-| **AI Brain** | Google Gemini 2.5 Flash API |
-| **Data Analysis** | Pandas |
-| **Language** | Python 3.11+ |
-| **Deployment** | GitHub + Streamlit Cloud |
+| **Frontend** | Streamlit (Python) |
+| **AI Engine** | Google Gemini 2.5 Flash API |
+| **Data Logic** | Pandas & TextBlob |
+| **Deployment** | GitHub + Streamlit Community Cloud |
 
 ## 🚀 Setup & Installation
 
 ### 1. Prerequisites
-* Python 3.9 or higher.
-* A Google AI Studio API Key.
+* Python 3.9+
+* A Google AI Studio API Key ([Get it here](https://aistudio.google.com/))
 
 ### 2. Local Installation
 ```bash
 # Clone the repository
-git clone [https://github.com/YOUR_USERNAME/student-buddy-ai.git](https://github.com/YOUR_USERNAME/student-buddy-ai.git)
-
-# Navigate to directory
+git clone [https://github.com/poonam150/student-buddy-ai.git](https://github.com/poonam150/student-buddy-ai.git)
 cd student-buddy-ai
 
-# Install required libraries
+# Install dependencies
 pip install -r requirements.txt
+
+3. Configuration
+Add your API key to your Streamlit secrets or create a .streamlit/secrets.toml file:
+GOOGLE_API_KEY = "your_actual_api_key_here"
+
+4. Run the App
+streamlit run app.py
+
 
