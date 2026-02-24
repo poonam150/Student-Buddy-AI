@@ -1,10 +1,8 @@
 import streamlit as st
-from textblob import TextBlob
 import pandas as pd
 import datetime
-import google.generativeai as genai
+from google import genai
 import os
-import time
 
 # 1. API SETUP
 if "GOOGLE_API_KEY" in st.secrets:
@@ -12,96 +10,52 @@ if "GOOGLE_API_KEY" in st.secrets:
 else:
     api_key = os.getenv("GOOGLE_API_KEY")
 
-genai.configure(api_key=api_key)
-model = genai.GenerativeModel('gemini-1.5-flash-latest')
+# Using the new 2026 Client logic
+client = genai.Client(api_key=api_key)
 
-# 2. PAGE CONFIG
-st.set_page_config(page_title="BuddyAI Pro", page_icon="🧘‍♂️", layout="wide")
+st.set_page_config(page_title="Student Buddy AI Pro", page_icon="🧘‍♂️")
 
-# --- UI STYLING ---
-st.markdown("""
-    <style>
-    .stApp { background: #0e1117; color: #ffffff; }
-    .stChatMessage { border-radius: 15px; margin-bottom: 10px; border: 1px solid #30363d; }
-    [data-testid="stMetricValue"] { color: #00f2fe; }
-    </style>
-    """, unsafe_allow_html=True)
+# --- UI STYLE ---
+st.markdown("<style>.stApp { background: #0e1117; color: white; }</style>", unsafe_allow_html=True)
 
-# 3. INITIALIZE STATE
 if "messages" not in st.session_state:
     st.session_state.messages = []
-if "mood_data" not in st.session_state:
-    st.session_state.mood_data = []
 
-# --- SIDEBAR: WELLNESS TOOLS ---
-with st.sidebar:
-    st.title("🌿 Zen Tools")
-    
-    # Feature 1: Breathwork Timer
-    st.subheader("Box Breathing")
-    if st.button("Start 1-Min Reset"):
-        progress_bar = st.progress(0)
-        status = st.empty()
-        for i in range(1, 16): # 4 cycles of 4-sec box breathing
-            status.text("💨 Breathe In (4s)")
-            time.sleep(1); progress_bar.progress(i*6)
-    
-    st.divider()
-    
-    # Feature 2: Crisis Support
-    with st.expander("🚨 Need Immediate Help?"):
-        st.write("You're not alone. Text HOME to 741741 (US/Canada) or 85258 (UK).")
-
-# --- MAIN INTERFACE ---
 st.title("🤖 Student Buddy AI Pro")
 
-# Display Chat History
+# Display Chat
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-# 4. CHAT INPUT LOGIC
+# 2. CHAT LOGIC
 if prompt := st.chat_input("How are you feeling, friend?"):
-    # Display user message
     with st.chat_message("user"):
         st.markdown(prompt)
     st.session_state.messages.append({"role": "user", "content": prompt})
 
-    # Perform Sentiment Analysis
-    sentiment = TextBlob(prompt).sentiment.polarity
-    st.session_state.mood_data.append({
-        "Time": datetime.datetime.now().strftime("%H:%M"),
-        "Score": sentiment
-    })
-
-    # Get AI Response
     with st.chat_message("assistant"):
-        with st.spinner("Writing..."):
+        with st.spinner("Buddy is thinking..."):
             try:
-                full_prompt = f"You are an empathetic student buddy. Reply to: '{prompt}'. Keep it warm and human."
-                response = model.generate_content(full_prompt)
+                # Using Gemini 2.0 Flash - the most stable model in 2026
+                response = client.models.generate_content(
+                    model="gemini-2.0-flash", 
+                    contents=f"You are a kind student buddy. Reply to: '{prompt}' in 2 warm sentences."
+                )
                 bot_reply = response.text
-                st.markdown(bot_reply)
-            except:
-                bot_reply = "I'm right here. Take a breath, I'm listening."
-                st.write(bot_reply)
-                
-    st.session_state.messages.append({"role": "assistant", "content": bot_reply})
+            except Exception as e:
+                # VARIED BACKUP: If API fails, it picks a random tip so it's NOT a loop
+                backups = [
+                    "I'm here for you. Why don't we try taking three deep breaths together?",
+                    "That sounds like a lot to handle. Remember, you've overcome tough days before.",
+                    "I'm listening. Sometimes just saying it out loud helps a little bit, doesn't it?"
+                ]
+                import random
+                bot_reply = random.choice(backups)
+            
+            st.markdown(bot_reply)
+            st.session_state.messages.append({"role": "assistant", "content": bot_reply})
 
-# 5. DASHBOARD SECTION (Below Chat)
-if st.session_state.mood_data:
-    st.divider()
-    st.subheader("📊 Your Weekly Vibe Check")
-    df = pd.DataFrame(st.session_state.mood_data)
-    
-    col1, col2 = st.columns([1, 3])
-    with col1:
-        avg_vibe = sum(d['Score'] for d in st.session_state.mood_data) / len(st.session_state.mood_data)
-        st.metric("Overall Sentiment", f"{avg_vibe:.2f}")
-        if avg_vibe < -0.2: st.warning("Sending extra hugs today! 🫂")
-    
-    with col2:
-        st.line_chart(df.set_index("Time")["Score"])
 
 
 
