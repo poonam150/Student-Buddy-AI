@@ -2,20 +2,22 @@ import streamlit as st
 from textblob import TextBlob
 import pandas as pd
 import datetime
-import requests
+import google.generativeai as genai
 import os
-from dotenv import load_dotenv
 
-# 1. SETUP
-if "HF_TOKEN" in st.secrets:
-    my_token = st.secrets["HF_TOKEN"]
+# 1. SETUP - Loading the Google Password
+if "GOOGLE_API_KEY" in st.secrets:
+    api_key = st.secrets["GOOGLE_API_KEY"]
 else:
-    load_dotenv()
-    my_token = os.getenv("HF_TOKEN")
+    api_key = os.getenv("GOOGLE_API_KEY")
+
+# Configuring the AI
+genai.configure(api_key=api_key)
+model = genai.GenerativeModel('gemini-1.5-flash')
 
 st.set_page_config(page_title="Student Buddy AI", page_icon="🤖")
 
-# --- CUSTOM CSS ---
+# --- UI THEME ---
 st.markdown("""
     <style>
     .stApp { background: radial-gradient(circle, #1a1c2c 0%, #0e1117 100%); color: #e0e0e0; }
@@ -24,66 +26,53 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# 2. AI BRAIN FUNCTION
-def get_ai_response(user_text):
-    API_URL = "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.2"
-    headers = {"Authorization": f"Bearer {my_token}", "X-Wait-For-Model": "true"}
-    
-    # We ask the AI to be a friend, not a robot
-    prompt = f"<s>[INST] You are a kind student buddy. Someone says: '{user_text}'. Reply with one comforting sentence and then give 2 short self-care tips. [/INST]"
-    
-    try:
-        response = requests.post(API_URL, headers=headers, json={"inputs": prompt, "parameters": {"max_new_tokens": 100}}, timeout=10)
-        result = response.json()
-        raw_output = result[0]['generated_text']
-        return raw_output.split("[/INST]")[-1].strip()
-    except:
-        # Emergency backup if AI is slow
-        return "I'm listening. That sounds tough, but you aren't alone. Try drinking some water and taking a 5-minute walk."
-
-# 3. APP LOGIC
+# 2. SESSION STATE
 if 'mood_history' not in st.session_state:
     st.session_state.mood_history = []
 
+# 3. INTERFACE
 st.title("🤖 Student Buddy AI")
-st.write("Talk to me. I'm here to listen and help you track your vibes.")
+st.write("A real AI companion that listens and tracks your emotional well-being.")
 
-user_input = st.text_input("What's on your mind?", key="input")
+user_input = st.text_input("What's on your mind?", key="user_msg")
 
 if user_input:
-    # --- SENTIMENT ---
+    # --- SENTIMENT ANALYSIS ---
     analysis = TextBlob(user_input)
-    # We "smooth" the score so the chart doesn't jump too drastically
-    new_score = analysis.sentiment.polarity
+    score = round(analysis.sentiment.polarity, 2)
     
-    # --- AI TALK ---
+    # --- REAL AI CONVERSATION ---
     with st.spinner("Buddy is thinking..."):
-        reply = get_ai_response(user_input)
-    
-    st.chat_message("assistant").write(reply)
-    
-    # --- SAVE TO HISTORY ---
-    st.session_state.mood_history.append({
-        "Time": datetime.datetime.now().strftime("%H:%M:%S"), 
-        "Score": new_score
-    })
+        try:
+            # The AI prompt
+            prompt = f"You are a kind, empathetic student counselor. A student says: '{user_input}'. Reply like a friend in 2-3 sentences and give a small piece of advice."
+            response = model.generate_content(prompt)
+            bot_text = response.text
+        except Exception as e:
+            bot_text = "I'm listening, but my connection is a bit slow. How are you doing otherwise?"
 
-# 4. SMOOTH CHART DASHBOARD
+    # Show the AI response
+    st.chat_message("assistant").write(bot_text)
+    
+    # Save to history
+    st.session_state.mood_history.append({"Time": datetime.datetime.now().strftime("%H:%M:%S"), "Score": score})
+
+# 4. DASHBOARD
 if st.session_state.mood_history:
     st.divider()
     df = pd.DataFrame(st.session_state.mood_history)
     
     col1, col2 = st.columns(2)
-    col1.metric("Current Vibe", f"{st.session_state.mood_history[-1]['Score']:.2f}")
+    current_mood_val = st.session_state.mood_history[-1]["Score"]
+    col1.metric("Current Mood", f"{current_mood_val}")
     
-    # Overall Status logic
     avg_score = df["Score"].mean()
-    status = "Thriving ✨" if avg_score > 0.2 else "Doing Okay ⚖️" if avg_score > -0.2 else "Needs Support 💙"
-    col2.metric("Overall Health", status)
+    status = "Positive ✨" if avg_score > 0.1 else "Neutral ⚖️" if avg_score > -0.1 else "Needs Support 💙"
+    col2.metric("Overall Vibe", status)
 
-    st.subheader("📈 Your Mood Journey")
-    # We show the line chart with a fixed scale so it doesn't look "crazy"
+    st.subheader("📈 Emotional Trend")
     st.line_chart(df.set_index("Time")["Score"])
+
 
 
 
