@@ -1,5 +1,5 @@
 streamlit
 textblob
 pandas
-python-dotenv
-requests
+google-generativeai
+
